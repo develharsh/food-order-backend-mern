@@ -39,7 +39,7 @@ export const signup = async (req: Request, res: Response) => {
     user_password = await bcrypt.hash(user_password, 12);
     let finalUserOpenForOrder = user_role == "delivery" ? false : null;
     const user = await pool.query(
-      `insert into users(user_email, user_password, user_name, user_role, user_open_for_order) values($1, $2, $3, $4, $5) returning user_id;`,
+      `insert into users(user_email, user_password, user_name, user_role, user_open_for_order) values($1, $2, $3, $4, $5) returning *;`,
       [user_email, user_password, user_name, user_role, finalUserOpenForOrder]
     );
     const token = jwt.sign(
@@ -51,7 +51,12 @@ export const signup = async (req: Request, res: Response) => {
     );
     res
       .status(statusCode)
-      .json({ success: true, message: `Successfully registered user`, token });
+      .json({
+        success: true,
+        message: `Successfully registered user`,
+        token,
+        data: user.rows.at(0),
+      });
   } catch (error: any) {
     res.status(statusCode).json({ success: false, message: error.message });
   }
@@ -98,6 +103,7 @@ export const login = async (req: Request, res: Response) => {
       success: true,
       message: `Successfully logged in with user`,
       token,
+      data: exists.rows.at(0),
     });
   } catch (error: any) {
     res.status(statusCode).json({ success: false, message: error.message });

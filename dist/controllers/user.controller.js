@@ -34,13 +34,18 @@ const signup = async (req, res) => {
         }
         user_password = await bcrypt_1.default.hash(user_password, 12);
         let finalUserOpenForOrder = user_role == "delivery" ? false : null;
-        const user = await database_1.default.query(`insert into users(user_email, user_password, user_name, user_role, user_open_for_order) values($1, $2, $3, $4, $5) returning user_id;`, [user_email, user_password, user_name, user_role, finalUserOpenForOrder]);
+        const user = await database_1.default.query(`insert into users(user_email, user_password, user_name, user_role, user_open_for_order) values($1, $2, $3, $4, $5) returning *;`, [user_email, user_password, user_name, user_role, finalUserOpenForOrder]);
         const token = jsonwebtoken_1.default.sign({ _id: user.rows.at(0).user_id }, process.env.NODE_JWT_SECRET ?? "dummy", {
             expiresIn: "5d",
         });
         res
             .status(statusCode)
-            .json({ success: true, message: `Successfully registered user`, token });
+            .json({
+            success: true,
+            message: `Successfully registered user`,
+            token,
+            data: user.rows.at(0),
+        });
     }
     catch (error) {
         res.status(statusCode).json({ success: false, message: error.message });
@@ -76,6 +81,7 @@ const login = async (req, res) => {
             success: true,
             message: `Successfully logged in with user`,
             token,
+            data: exists.rows.at(0),
         });
     }
     catch (error) {
