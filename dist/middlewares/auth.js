@@ -4,7 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isAuthenticated = void 0;
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const jsonwebtoken_1 = require("jsonwebtoken");
 const database_1 = __importDefault(require("../database"));
 const isAuthenticated = async (req, res, next) => {
     try {
@@ -12,11 +12,8 @@ const isAuthenticated = async (req, res, next) => {
         if (!token)
             throw new Error("User is not logged in");
         token = token.replace("Bearer ", "");
-        if (!process.env.JWT_SECRET) {
-            throw new Error("Env JWT Secret not loaded");
-        }
-        const payload = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
-        const userData = await database_1.default.query(`select * from users where id='${payload._id}' limit 1;`);
+        const payload = (0, jsonwebtoken_1.verify)(token, process.env.NODE_JWT_SECRET ?? "dummy");
+        const userData = await database_1.default.query(`select * from users where user_id=$1 limit 1;`, [payload._id]);
         if (userData.rowCount == 0)
             throw new Error("Session Expired, Please Login Again");
         else {
@@ -25,6 +22,8 @@ const isAuthenticated = async (req, res, next) => {
         }
     }
     catch (err) {
+        if (["invalid token", "jwt expired"].includes(err.message))
+            err.message = `Session Expired, Please Login Again`;
         res.status(401).json({ success: false, message: err.message });
     }
 };

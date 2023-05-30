@@ -10,31 +10,32 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const signup = async (req, res) => {
     let statusCode = 201;
     try {
-        if (!process.env.JWT_SECRET) {
-            statusCode = 500;
-            throw new Error("Env JWT Secret not loaded");
-        }
-        let { email, password, name } = req.body;
-        if (!email) {
+        let user_email = req.body.user_email, user_password = req.body.user_password, user_name = req.body.user_name, user_role = req.body.user_role;
+        if (!user_email) {
             statusCode = 400;
             throw new Error("Invalid Email");
         }
-        if (!password) {
+        if (!user_password) {
             statusCode = 400;
             throw new Error("Invalid Password");
         }
-        if (!name) {
+        if (!user_name) {
             statusCode = 400;
             throw new Error("Invalid Name");
         }
-        const exists = await database_1.default.query(`select * from users where email='${email}' limit 1;`);
+        if (!user_role) {
+            statusCode = 400;
+            throw new Error("Invalid Name");
+        }
+        const exists = await database_1.default.query(`select * from users where user_email=$1 limit 1;`, [user_email]);
         if (exists.rowCount) {
             statusCode = 500;
             throw new Error("Email already registered");
         }
-        password = await bcrypt_1.default.hash(password, 12);
-        const user = await database_1.default.query(`insert into users(email, password, name) values($1, $2, $3) returning id;`, [email, password, name]);
-        const token = jsonwebtoken_1.default.sign({ _id: user.rows.at(0) }, process.env.JWT_SECRET, {
+        user_password = await bcrypt_1.default.hash(user_password, 12);
+        let finalUserOpenForOrder = user_role == "delivery" ? false : null;
+        const user = await database_1.default.query(`insert into users(user_email, user_password, user_name, user_role, user_open_for_order) values($1, $2, $3, $4, $5) returning user_id;`, [user_email, user_password, user_name, user_role, finalUserOpenForOrder]);
+        const token = jsonwebtoken_1.default.sign({ _id: user.rows.at(0).user_id }, process.env.NODE_JWT_SECRET ?? "dummy", {
             expiresIn: "5d",
         });
         res
@@ -49,30 +50,26 @@ exports.signup = signup;
 const login = async (req, res) => {
     let statusCode = 200;
     try {
-        if (!process.env.JWT_SECRET) {
-            statusCode = 500;
-            throw new Error("Env JWT Secret not loaded");
-        }
-        let { email, password } = req.body;
-        if (!email) {
+        let user_email = req.body.user_email, user_password = req.body.user_password;
+        if (!user_email) {
             statusCode = 400;
             throw new Error("Invalid Email");
         }
-        if (!password) {
+        if (!user_password) {
             statusCode = 400;
             throw new Error("Invalid Password");
         }
-        const exists = await database_1.default.query(`select * from users where email='${email}' limit 1;`);
+        const exists = await database_1.default.query(`select * from users where user_email=$1 limit 1;`, [user_email]);
         if (exists.rowCount == 0) {
             statusCode = 500;
             throw new Error(`No such user exists`);
         }
-        const isPasswordMatching = await bcrypt_1.default.compare(password, exists.rows.at(0).password);
+        const isPasswordMatching = await bcrypt_1.default.compare(user_password, exists.rows.at(0).user_password);
         if (!isPasswordMatching) {
             statusCode = 400;
             throw new Error("No such user exists");
         }
-        const token = jsonwebtoken_1.default.sign({ _id: exists.rows.at(0).id }, process.env.JWT_SECRET, {
+        const token = jsonwebtoken_1.default.sign({ _id: exists.rows.at(0).user_id }, process.env.NODE_JWT_SECRET ?? "dummy", {
             expiresIn: "5d",
         });
         res.status(statusCode).json({
